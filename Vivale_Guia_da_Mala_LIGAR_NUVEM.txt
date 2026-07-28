@@ -1,0 +1,139 @@
+══════════════════════════════════════════════════════════════════
+  VIVALE · GUIA DA MALA — COMO LIGAR A NUVEM (Google Sheets)
+══════════════════════════════════════════════════════════════════
+
+PRA QUE SERVE
+-------------
+Sem a nuvem, quando uma cliente preenche o Guia no aparelho dela, o
+cadastro fica salvo SÓ no aparelho dela — não chega até você. Isso é
+ótimo pra testar e pra usar presencialmente (a cliente preenche no SEU
+celular), mas não serve pro seu objetivo: mandar o link pras clientes
+preencherem sozinhas.
+
+Ligando a nuvem, todo cadastro cai automaticamente numa planilha do
+Google que é sua — de qualquer aparelho, de qualquer lugar. Essa
+planilha vira sua LISTA CENTRAL de leads.
+
+É de graça e leva uns 10 minutos. Você faz uma vez só.
+
+
+PASSO A PASSO
+-------------
+1) Crie uma planilha nova no Google Sheets (sheets.google.com).
+   Dê o nome que quiser, ex.: "Vivale — Leads da Mala".
+
+2) No menu da planilha: Extensões → Apps Script.
+   Vai abrir um editor de código numa aba nova.
+
+3) Apague qualquer código que estiver lá e cole TODO o código que
+   está na seção "CÓDIGO" mais abaixo neste arquivo.
+
+4) Clique em Salvar (ícone do disquete).
+
+5) Clique em "Implantar" (Deploy) → "Nova implantação".
+   - Em "Tipo", escolha "App da Web".
+   - "Executar como": Eu (seu e-mail).
+   - "Quem pode acessar": Qualquer pessoa.
+   - Clique em "Implantar".
+   - O Google vai pedir pra autorizar — aceite (é seguro, é sua conta).
+
+6) Copie a URL que termina em /exec. É ela que liga tudo.
+   (Fica algo como: https://script.google.com/macros/s/AKfy.../exec)
+
+7) Abra o arquivo do app (vivale_mala.html) num editor de texto,
+   ache lá no comecinho do script o trecho:
+
+        CLOUD_URL: "",
+
+   e cole sua URL entre as aspas:
+
+        CLOUD_URL: "https://script.google.com/macros/s/AKfy.../exec",
+
+   Salve o arquivo e suba a nova versão do guia-da-mala.html no seu
+   repositório do GitHub (o mesmo lugar de onde você publicou o site).
+
+Pronto. A partir daí, cada mala gerada por qualquer cliente cai na sua
+planilha automaticamente.
+
+
+COMO USAR NO DIA A DIA
+----------------------
+- A sua LISTA CENTRAL de todos os leads é a própria planilha do Google.
+  Abra ela quando quiser — dá pra filtrar, ordenar, marcar, exportar.
+
+- O painel dentro do app (link + #painel, senha padrão "vivale2026")
+  mostra os cadastros e deixa você exportar CSV, mudar status e anotar.
+  O botão "Sincronizar nuvem" tenta puxar os cadastros da planilha pro
+  painel. Se o navegador bloquear (acontece, por segurança), não tem
+  problema: a lista completa está sempre na planilha.
+
+- Troque a senha do painel: no mesmo trecho do código do app, mude
+        PAINEL_SENHA: "vivale2026"
+  pela senha que você quiser.
+
+
+SEGURANÇA E LGPD (importante)
+-----------------------------
+Você vai coletar nome, WhatsApp, destino e data de viagem de pessoas
+reais. Trate como dado pessoal:
+- Deixe claro pra cliente que ela está deixando os dados com a Vivale
+  pra receber o guia e o contato (um aviso curto de consentimento).
+- Não compartilhe a planilha com quem não precisa.
+- A senha do painel é uma trava simples, um freio — não é segurança
+  forte. O que protege de verdade os dados é o acesso à sua planilha
+  do Google e ao seu repositório no GitHub.
+
+
+══════════════════════════════════════════════════════════════════
+  CÓDIGO (cole no Apps Script — passo 3)
+══════════════════════════════════════════════════════════════════
+
+/**
+ * Vivale — recebe os cadastros do Guia da Mala e grava numa planilha.
+ * POST: adiciona uma linha.  GET: devolve os cadastros em JSON.
+ */
+function doPost(e){
+  try{
+    var dados = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName('Leads') || ss.insertSheet('Leads');
+    if(sh.getLastRow() === 0){
+      sh.appendRow(['id','data_cadastro','nome','whatsapp','destino','data_viagem',
+        'clima','duracao','cabelo','pele','skincare','maquiagem','extras','status','nota']);
+    }
+    sh.appendRow([
+      dados.id, new Date(dados.ts || Date.now()), dados.nome, dados.whats,
+      dados.destino, dados.data, dados.clima, dados.duracao, dados.cabelo,
+      dados.pele, dados.skincare, dados.maquiagem, dados.extras,
+      dados.status || 'novo', dados.nota || ''
+    ]);
+    return ContentService.createTextOutput(JSON.stringify({ok:true}))
+           .setMimeType(ContentService.MimeType.JSON);
+  }catch(err){
+    return ContentService.createTextOutput(JSON.stringify({ok:false, erro:String(err)}))
+           .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(){
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName('Leads');
+  if(!sh || sh.getLastRow() < 2){
+    return ContentService.createTextOutput('[]').setMimeType(ContentService.MimeType.JSON);
+  }
+  var vals = sh.getDataRange().getValues();
+  vals.shift(); // tira o cabeçalho
+  var out = vals.map(function(r){
+    return {
+      id:r[0], ts:new Date(r[1]).getTime(), nome:r[2], whats:r[3], destino:r[4],
+      data:r[5], clima:r[6], duracao:r[7], cabelo:r[8], pele:r[9], skincare:r[10],
+      maquiagem:r[11], extras:r[12], status:r[13], nota:r[14]
+    };
+  });
+  return ContentService.createTextOutput(JSON.stringify(out))
+         .setMimeType(ContentService.MimeType.JSON);
+}
+
+══════════════════════════════════════════════════════════════════
+Dúvida em qualquer passo, me chama que a gente resolve junto.
+══════════════════════════════════════════════════════════════════
